@@ -24,6 +24,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CatalogClient catalogClient;
     private final SaleStockRepository saleStockRepository;
+    private final SaleStockInitializer saleStockInitializer;
 
     public Order placeOrder(CreateOrderCommand command) {
         SaleResponse sale = catalogClient.getSale(command.saleId());
@@ -31,7 +32,7 @@ public class OrderService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Sale is not active");
         }
 
-        ensureSaleStock(sale);
+        saleStockInitializer.ensureInitialized(sale);
 
         Order order = new Order();
         order.setId(UUID.randomUUID());
@@ -53,23 +54,13 @@ public class OrderService {
 
     public SaleView getSaleView(UUID saleId) {
         SaleResponse sale = catalogClient.getSale(saleId);
-        ensureSaleStock(sale);
+        saleStockInitializer.ensureInitialized(sale);
         SaleStock stock = saleStockRepository.findById(saleId).orElseThrow();
         int available = stock.getInitialStock() - stock.getSold();
         SaleStatus status = available <= 0 && sale.status() == SaleStatus.ACTIVE
                 ? SaleStatus.SOLD_OUT
                 : sale.status();
         return new SaleView(sale, available, status);
-    }
-
-    private void ensureSaleStock(SaleResponse sale) {
-        saleStockRepository.findById(sale.id()).orElseGet(() -> {
-            SaleStock created = new SaleStock();
-            created.setSaleId(sale.id());
-            created.setInitialStock(sale.initialStock());
-            created.setSold(0);
-            return saleStockRepository.save(created);
-        });
     }
 
     public record CreateOrderCommand(UUID saleId, int quantity, String userEmail, String idempotencyKey) {
