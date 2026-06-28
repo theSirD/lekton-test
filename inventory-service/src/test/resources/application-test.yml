@@ -1,0 +1,32 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+  task:
+    scheduling:
+      enabled: false
+  datasource:
+    url: jdbc:tc:postgresql:16:///inventory_db
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  flyway:
+    enabled: true
+
+inventory:
+  reserve-ttl-seconds: 60
+  outbox:
+    poll-interval-ms: 100000
+  expiry:
+    poll-interval-ms: 100000
+
+clients:
+  catalog:
+    base-url: http://localhost:8081
+  payment:
+    base-url: http://localhost:8083
