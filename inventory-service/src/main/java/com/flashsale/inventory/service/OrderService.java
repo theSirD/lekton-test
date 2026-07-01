@@ -1,9 +1,14 @@
 package com.flashsale.inventory.service;
 
 import com.flashsale.common.OrderStatus;
+import com.flashsale.common.PaymentStatus;
 import com.flashsale.common.SaleStatus;
+import com.flashsale.common.api.ChargeRequest;
+import com.flashsale.common.api.ChargeResponse;
+import com.flashsale.common.api.RefundRequest;
 import com.flashsale.common.api.SaleResponse;
 import com.flashsale.inventory.client.CatalogClient;
+import com.flashsale.inventory.client.PaymentClient;
 import com.flashsale.inventory.domain.Order;
 import com.flashsale.inventory.redis.RedisStockService;
 import com.flashsale.inventory.repository.OrderRepository;
@@ -25,6 +30,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final CatalogClient catalogClient;
+    private final PaymentClient paymentClient;
     private final RedisStockService redisStockService;
     private final SaleStockRepository saleStockRepository;
     private final SaleStockInitializer saleStockInitializer;
@@ -34,6 +40,7 @@ public class OrderService {
 
     public Order placeOrder(CreateOrderCommand command) {
         return orderRepository.findByIdempotencyKey(command.idempotencyKey())
+                .map(this::resumeIfNeeded)
                 .orElseGet(() -> createOrder(command));
     }
 
@@ -56,6 +63,13 @@ public class OrderService {
         Instant cutoff = Instant.now().minusSeconds(reserveTtlSeconds);
         orderRepository.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, cutoff)
                 .forEach(this::expireOrder);
+    }
+
+    private Order resumeIfNeeded(Order order) {
+        if (order.getStatus() == OrderStatus.PENDING) {
+            return completePendingOrder(order, null);
+        }
+        return order;
     }
 
     private Order createOrder(CreateOrderCommand command) {
@@ -88,12 +102,27 @@ public class OrderService {
             throw ex;
         }
 
-        return confirmOrder(order);
+        return completePendingOrder(order, null);
     }
 
     @Transactional
     protected Order savePending(Order order) {
         return orderRepository.save(order);
+    }
+
+    private Order completePendingOrder(Order order, String paymentOutcome) {
+        try {
+            ChargeResponse paymentResponse = paymentOutcome == null
+                    ? paymentClient.charge(new ChargeRequest(order.getId(), order.getAmount()))
+                    : paymentClient.chargeWithOutcome(new ChargeRequest(order.getId(), order.getAmount()), paymentOutcome);
+
+            if (paymentResponse.status() == PaymentStatus.SUCCESS) {
+                return confirmOrder(order);
+            }
+            return cancelOrder(order, false);
+        } catch (RuntimeException ex) {
+            return cancelOrder(order, false);
+        }
     }
 
     @Transactional
@@ -103,17 +132,30 @@ public class OrderService {
         }
         int updated = saleStockRepository.incrementSoldIfAvailable(order.getSaleId(), order.getQuantity());
         if (updated == 0) {
-            redisStockService.releaseReserve(order.getSaleId(), order.getId());
-            order.setStatus(OrderStatus.CANCELLED);
-            order.setUpdatedAt(Instant.now());
-            orderRepository.save(order);
-            return order;
+            paymentClient.refund(new RefundRequest(order.getId()));
+            redisStockService.consumeReserve(order.getId());
+            redisStockService.adjustStock(order.getSaleId(), order.getQuantity());
+            return cancelOrder(order, true);
         }
 
         order.setStatus(OrderStatus.CONFIRMED);
         order.setUpdatedAt(Instant.now());
         orderRepository.save(order);
         redisStockService.consumeReserve(order.getId());
+        return order;
+    }
+
+    @Transactional
+    protected Order cancelOrder(Order order, boolean stockAlreadyReturned) {
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.EXPIRED) {
+            return order;
+        }
+        if (!stockAlreadyReturned) {
+            redisStockService.releaseReserve(order.getSaleId(), order.getId());
+        }
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setUpdatedAt(Instant.now());
+        orderRepository.save(order);
         return order;
     }
 
