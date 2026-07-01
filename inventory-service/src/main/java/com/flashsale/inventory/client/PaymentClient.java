@@ -18,11 +18,7 @@ public class PaymentClient {
     }
 
     public ChargeResponse charge(ChargeRequest request) {
-        return restClient.post()
-                .uri("/api/payments/charge")
-                .body(request)
-                .retrieve()
-                .body(ChargeResponse.class);
+        return post("/api/payments/charge", request, ChargeResponse.class);
     }
 
     public ChargeResponse chargeWithOutcome(ChargeRequest request, String outcome) {
@@ -35,10 +31,14 @@ public class PaymentClient {
     }
 
     public RefundResponse refund(RefundRequest request) {
+        return post("/api/payments/refund", request, RefundResponse.class);
+    }
+
+    private <T> T post(String path, Object body, Class<T> responseType) {
         return restClient.post()
-                .uri("/api/payments/refund")
-                .body(request)
+                .uri(path)
+                .body(body)
                 .retrieve()
-                .body(RefundResponse.class);
+                .body(responseType);
     }
 }
