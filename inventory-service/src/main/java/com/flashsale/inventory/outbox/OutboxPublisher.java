@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
@@ -30,10 +31,11 @@ public class OutboxPublisher {
         for (OutboxEvent event : events) {
             try {
                 String payload = objectMapper.writeValueAsString(event.getPayload());
-                kafkaTemplate.send(Topics.ORDER_EVENTS, event.getAggregateId().toString(), payload);
+                kafkaTemplate.send(Topics.ORDER_EVENTS, event.getAggregateId().toString(), payload)
+                        .get(5, TimeUnit.SECONDS);
                 event.setPublishedAt(Instant.now());
             } catch (Exception ex) {
-                log.error("Failed to publish outbox event {}", event.getId(), ex);
+                log.error("Failed to publish outbox event {}, will retry on next poll", event.getId(), ex);
             }
         }
     }
