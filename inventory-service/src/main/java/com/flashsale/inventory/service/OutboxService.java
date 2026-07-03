@@ -1,5 +1,6 @@
 package com.flashsale.inventory.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flashsale.common.events.OrderEvent;
 import com.flashsale.inventory.domain.OutboxEvent;
@@ -16,6 +17,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OutboxService {
 
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
+    };
+
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
 
@@ -25,7 +29,7 @@ public class OutboxService {
         outboxEvent.setId(UUID.randomUUID());
         outboxEvent.setAggregateId(aggregateId);
         outboxEvent.setEventType(event.eventType());
-        Map<String, Object> payload = objectMapper.convertValue(event, Map.class);
+        Map<String, Object> payload = objectMapper.convertValue(event, MAP_TYPE);
         payload.put("eventType", event.eventType());
         outboxEvent.setCreatedAt(Instant.now());
         outboxEvent.setPayload(payload);
