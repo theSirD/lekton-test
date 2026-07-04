@@ -37,21 +37,8 @@ public class NotificationService {
 
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(event.userEmail());
-
-            if (event instanceof OrderConfirmedEvent) {
-                message.setSubject("Order confirmed");
-                message.setText("Your purchase is confirmed. Order " + event.orderId()
-                        + ": " + event.quantity() + " item(s), total " + event.amount() + " RUB.");
-            } else if (event instanceof OrderCancelledEvent) {
-                message.setSubject("Order cancelled");
-                message.setText("Your order was cancelled. Order " + event.orderId()
-                        + ": " + event.quantity() + " item(s), total " + event.amount() + " RUB.");
-            } else {
-                message.setSubject("Order update");
-                message.setText("Order " + event.orderId()
-                        + ": " + event.quantity() + " item(s), total " + event.amount() + " RUB.");
-            }
-
+            message.setSubject(buildSubject(event));
+            message.setText(buildBody(event));
             mailSender.send(message);
 
             ProcessedEvent processed = new ProcessedEvent();
@@ -64,5 +51,23 @@ public class NotificationService {
             log.error("Failed to process notification event", ex);
             throw new IllegalStateException("Notification processing failed", ex);
         }
+    }
+
+    private String buildSubject(OrderEvent event) {
+        return switch (event) {
+            case OrderConfirmedEvent ignored -> "Order confirmed";
+            case OrderCancelledEvent ignored -> "Order cancelled";
+            default -> "Order update";
+        };
+    }
+
+    private String buildBody(OrderEvent event) {
+        String summary = "Order %s: %d item(s), total %s RUB."
+                .formatted(event.orderId(), event.quantity(), event.amount());
+        return switch (event) {
+            case OrderConfirmedEvent ignored -> "Your purchase is confirmed. " + summary;
+            case OrderCancelledEvent ignored -> "Your order was cancelled. " + summary;
+            default -> summary;
+        };
     }
 }
