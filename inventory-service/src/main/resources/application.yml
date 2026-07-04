@@ -36,6 +36,7 @@ inventory:
     poll-interval-ms: 1000
   expiry:
     poll-interval-ms: 5000
+    cutoff-seconds: 540
 
 management:
   endpoints:

@@ -27,8 +27,8 @@ public class OrderService {
     private final OrderCreationService orderCreationService;
     private final SaleStockInitializer saleStockInitializer;
 
-    @Value("${inventory.reserve-ttl-seconds:600}")
-    private long reserveTtlSeconds;
+    @Value("${inventory.expiry.cutoff-seconds:540}")
+    private long expiryCutoffSeconds;
 
     public Order placeOrder(CreateOrderCommand command) {
         return orderRepository.findByIdempotencyKey(command.idempotencyKey())
@@ -52,7 +52,7 @@ public class OrderService {
     }
 
     public void expireStaleOrders() {
-        Instant cutoff = Instant.now().minusSeconds(reserveTtlSeconds);
+        Instant cutoff = Instant.now().minusSeconds(expiryCutoffSeconds);
         orderRepository.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, cutoff)
                 .forEach(orderStateService::expire);
     }
