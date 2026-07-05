@@ -4,11 +4,11 @@ import com.flashsale.common.OrderStatus;
 import com.flashsale.common.SaleStatus;
 import com.flashsale.common.api.SaleResponse;
 import com.flashsale.inventory.client.CatalogClient;
+import com.flashsale.inventory.config.InventoryProperties;
 import com.flashsale.inventory.domain.Order;
 import com.flashsale.inventory.redis.RedisStockService;
 import com.flashsale.inventory.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -26,9 +26,7 @@ public class OrderService {
     private final OrderStateService orderStateService;
     private final OrderCreationService orderCreationService;
     private final SaleStockInitializer saleStockInitializer;
-
-    @Value("${inventory.expiry.cutoff-seconds:540}")
-    private long expiryCutoffSeconds;
+    private final InventoryProperties inventoryProperties;
 
     public Order placeOrder(CreateOrderCommand command) {
         return orderRepository.findByIdempotencyKey(command.idempotencyKey())
@@ -52,7 +50,7 @@ public class OrderService {
     }
 
     public void expireStaleOrders() {
-        Instant cutoff = Instant.now().minusSeconds(expiryCutoffSeconds);
+        Instant cutoff = Instant.now().minusSeconds(inventoryProperties.getExpiry().getCutoffSeconds());
         orderRepository.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, cutoff)
                 .forEach(orderStateService::expire);
     }

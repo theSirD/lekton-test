@@ -8,10 +8,10 @@ import com.flashsale.common.api.ChargeResponse;
 import com.flashsale.common.api.SaleResponse;
 import com.flashsale.inventory.client.CatalogClient;
 import com.flashsale.inventory.client.PaymentClient;
+import com.flashsale.inventory.config.InventoryProperties;
 import com.flashsale.inventory.domain.Order;
 import com.flashsale.inventory.redis.RedisStockService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,9 +29,7 @@ public class OrderCreationService {
     private final RedisStockService redisStockService;
     private final OrderStateService orderStateService;
     private final SaleStockInitializer saleStockInitializer;
-
-    @Value("${inventory.reserve-ttl-seconds:600}")
-    private long reserveTtlSeconds;
+    private final InventoryProperties inventoryProperties;
 
     public Order createOrder(OrderService.CreateOrderCommand command) {
         SaleResponse sale = catalogClient.getSale(command.saleId());
@@ -41,7 +39,8 @@ public class OrderCreationService {
         saleStockInitializer.ensureInitialized(sale);
 
         UUID orderId = UUID.randomUUID();
-        if (!redisStockService.tryReserve(sale.id(), orderId, command.quantity(), reserveTtlSeconds)) {
+        if (!redisStockService.tryReserve(
+                sale.id(), orderId, command.quantity(), inventoryProperties.getReserveTtlSeconds())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Sold out");
         }
 
