@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+*.iml
+.DS_Store
+.gradle
+**/build
+docs
+.env
+.env.*
