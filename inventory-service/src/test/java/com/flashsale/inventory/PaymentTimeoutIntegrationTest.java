@@ -1,17 +1,13 @@
 package com.flashsale.inventory;
 
 import com.flashsale.common.OrderStatus;
-import com.flashsale.common.SaleStatus;
 import com.flashsale.common.api.ChargeRequest;
-import com.flashsale.common.api.SaleResponse;
 import com.flashsale.inventory.domain.SaleStock;
 import com.flashsale.inventory.service.OrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.ResourceAccessException;
 
-import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,25 +23,11 @@ class PaymentTimeoutIntegrationTest extends AbstractIntegrationTest {
         orderRepository.deleteAll();
         saleStockRepository.deleteAll();
 
-        when(catalogClient.getSale(SALE_ID)).thenReturn(new SaleResponse(
-                SALE_ID,
-                UUID.randomUUID(),
-                "Sneakers",
-                "Drop",
-                BigDecimal.TEN,
-                5,
-                Instant.now().minusSeconds(3600),
-                Instant.now().plusSeconds(3600),
-                SaleStatus.ACTIVE
-        ));
+        when(catalogClient.getSale(SALE_ID)).thenReturn(TestSaleFixtures.activeSale(SALE_ID, 5));
         when(paymentClient.charge(any(ChargeRequest.class)))
                 .thenThrow(new ResourceAccessException("payment timeout"));
 
-        SaleStock stock = new SaleStock();
-        stock.setSaleId(SALE_ID);
-        stock.setInitialStock(5);
-        stock.setSold(0);
-        saleStockRepository.save(stock);
+        saleStockRepository.save(TestSaleFixtures.saleStock(SALE_ID, 5));
         redisStockService.initializeStock(SALE_ID, 5);
     }
 

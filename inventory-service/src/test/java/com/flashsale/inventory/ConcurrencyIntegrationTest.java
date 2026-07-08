@@ -2,17 +2,13 @@ package com.flashsale.inventory;
 
 import com.flashsale.common.OrderStatus;
 import com.flashsale.common.PaymentStatus;
-import com.flashsale.common.SaleStatus;
 import com.flashsale.common.api.ChargeRequest;
 import com.flashsale.common.api.ChargeResponse;
-import com.flashsale.common.api.SaleResponse;
 import com.flashsale.inventory.domain.SaleStock;
 import com.flashsale.inventory.service.OrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -34,29 +30,14 @@ class ConcurrencyIntegrationTest extends AbstractIntegrationTest {
         orderRepository.deleteAll();
         saleStockRepository.deleteAll();
 
-        SaleResponse sale = new SaleResponse(
-                SALE_ID,
-                UUID.randomUUID(),
-                "Sneakers",
-                "Drop",
-                BigDecimal.TEN,
-                50,
-                Instant.now().minusSeconds(3600),
-                Instant.now().plusSeconds(3600),
-                SaleStatus.ACTIVE
-        );
-        when(catalogClient.getSale(SALE_ID)).thenReturn(sale);
+        when(catalogClient.getSale(SALE_ID)).thenReturn(TestSaleFixtures.activeSale(SALE_ID, 50));
         when(paymentClient.charge(any(ChargeRequest.class)))
                 .thenAnswer(invocation -> {
                     ChargeRequest request = invocation.getArgument(0);
                     return new ChargeResponse(UUID.randomUUID(), request.orderId(), PaymentStatus.SUCCESS);
                 });
 
-        SaleStock stock = new SaleStock();
-        stock.setSaleId(SALE_ID);
-        stock.setInitialStock(50);
-        stock.setSold(0);
-        saleStockRepository.save(stock);
+        saleStockRepository.save(TestSaleFixtures.saleStock(SALE_ID, 50));
         redisStockService.initializeStock(SALE_ID, 50);
     }
 
