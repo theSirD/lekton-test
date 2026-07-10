@@ -87,9 +87,11 @@ POST /api/orders
   → fail/timeout: release reserve, Outbox(OrderCancelled), refund если уже списали
 ```
 
-Если оплата прошла, но Postgres не принял инкремент `sold` — refund и отмена. Просроченные `PENDING` (TTL резерва) снимает scheduler: `EXPIRED`, остаток в Redis возвращается.
+Если оплата прошла, но Postgres не принял инкремент `sold` — refund и отмена. Просроченные `PENDING` снимает scheduler по cutoff чуть короче Redis TTL: `EXPIRED`, резерв в Redis возвращается.
 
-События из outbox пишутся в той же транзакции, что смена статуса. Publisher шлёт в Kafka; notification дедуплицирует по `(order_id, event_type)`.
+**Saga:** inventory оркестрирует шаги сам. Компенсации — `releaseReserve` при fail/timeout оплаты и `refund`, если charge уже прошёл, а `sold++` в Postgres не приняли.
+
+**Outbox:** событие пишется в той же транзакции, что смена статуса. Publisher помечает `published_at` только после ack от Kafka; при ошибке — retry на следующем poll. Notification дедуплицирует по `(order_id, event_type)`.
 
 ## Почему oversell невозможен
 
