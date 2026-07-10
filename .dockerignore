@@ -4,7 +4,11 @@
 *.iml
 .DS_Store
 .gradle
-**/build
+**/build/classes
+**/build/generated
+**/build/tmp
+**/build/reports
+**/build/test-results
 **/bin
 docs
 .env

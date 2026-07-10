@@ -26,10 +26,11 @@
 ```bash
 git clone https://github.com/theSirD/flash-sale-platform.git
 cd flash-sale-platform
+./gradlew bootJar -x test
 docker compose up --build
 ```
 
-Первая сборка образов занимает несколько минут (Gradle внутри Docker). После старта:
+Сначала Gradle собирает JAR-файлы локально, затем Docker упаковывает их в образы (без повторной сборки внутри контейнера). После старта:
 
 | | URL | Зачем |
 |---|---|---|
